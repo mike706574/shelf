@@ -59,11 +59,11 @@
 
 (defmacro with-ssh
   [expr & body]
-  `(let [~'session ~expr]
+  `(let [session# ~expr]
      (try
-       (let [~'shell (remote ~'session)]
-           (when-not (ssh/connected? ~'session)
-             (ssh/connect ~'session))
+       (let [~'shell (ssh session#)]
+           (when-not (ssh/connected? session#)
+             (ssh/connect session#))
          ~@body)
        (finally
-        (ssh/disconnect ~'session)))))
+        (ssh/disconnect session#)))))
