@@ -25,8 +25,7 @@
   (execute [this args]
     (let [command (str/join " " args)]
       (log/debug (str "Executing command: " command))
-      (ssh/ssh session {:in "echo START"})
-      (let [wrapped-command (str "echo \"___START___\"; " command "; echo \"___END___\"")
+      (let [wrapped-command (str "echo \"___START_OUT___\"; " command "; echo \"___END_OUT___\"")
             {exit :exit :as response} (ssh/ssh session {:in wrapped-command})]
         (log-response response)
         (-> response
