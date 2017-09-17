@@ -1,6 +1,7 @@
 (ns shelf.core
   (:require [clj-ssh.ssh :as ssh]
             [clojure.java.shell :as sh]
+            [clojure.spec.alpha :as s]
             [clojure.string :as str]
             [taoensso.timbre :as log]))
 
@@ -50,7 +51,7 @@
   [session]
   (SecureShell. session))
 
-(defn session [host username password]
+(defn session [{:keys [:shelf/host :shelf/username :shelf/password]}]
   (ssh/session (ssh/ssh-agent {}) host {:username username
                                         :password password
                                         :strict-host-key-checking :no}))
@@ -58,12 +59,17 @@
 (defn exec [shell args] (execute shell args))
 
 (defmacro with-ssh
-  [expr & body]
-  `(let [session# ~expr]
+  [config & body]
+  `(let [session# (session ~config)]
      (try
        (let [~'shell (ssh session#)]
            (when-not (ssh/connected? session#)
              (ssh/connect session#))
-         ~@body)
+           ~@body)
        (finally
         (ssh/disconnect session#)))))
+
+(s/def :shelf/host string?)
+(s/def :shelf/username string?)
+(s/def :shelf/password string?)
+(s/def :shelf/config (s/keys :req [:shelf/host :shelf/username :shelf/password]))
