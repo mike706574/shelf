@@ -56,6 +56,11 @@
                                         :password password
                                         :strict-host-key-checking :no}))
 
+(defn config [host username password]
+  {:shelf/host host
+   :shelf/username username
+   :shelf/password password})
+
 (defn exec [shell args] (execute shell args))
 
 (defmacro with-ssh
