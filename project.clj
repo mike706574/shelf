@@ -1,4 +1,4 @@
-(defproject org.clojars.mike706574/shelf "0.1.1-SNAPSHOT"
+(defproject org.clojars.mike706574/shelf "0.0.1-SNAPSHOT"
   :description "A project."
   :url "https://github.com/mike706574/shelf"
   :license {:name "Eclipse Public License"
