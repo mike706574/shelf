@@ -1,4 +1,4 @@
-(defproject fun.mike/shelf "0.0.1-SNAPSHOT"
+(defproject fun.mike/shelf "0.0.1"
   :description "A project."
   :url "https://github.com/mike706574/shelf"
   :license {:name "Eclipse Public License"
