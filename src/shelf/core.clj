@@ -3,6 +3,7 @@
             [clojure.java.shell :as sh]
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
+            [shelf.crypto :as crypto]
             [taoensso.timbre :as log]))
 
 (defprotocol Shell
@@ -20,19 +21,37 @@
 (defn ^:private output [s] (second (re-matches output-re s)))
 (defn ^:private unix-eol [s] (.replace s "\r\n" "\n"))
 
-(defrecord SecureShell [session]
+(defn ^:private execute-in-session
+  [session args]
+  (let [command (str/join " " args)]
+    (log/debug (str "Executing command: " command))
+    (let [wrapped-command (str "echo \"___START_OUT___\"; " command "; echo \"___END_OUT___\"")
+          {exit :exit :as response} (ssh/ssh session {:in wrapped-command})]
+      (log-response response)
+      (-> response
+          (update :out (comp output unix-eol))
+          (merge (if (zero? exit)
+                   {:status :ok :ok true}
+                   {:status :failure :ok false}))))))
+
+(defn session
+  ([host username password]
+   (ssh/session (ssh/ssh-agent {}) host {:username username
+                                         :password password
+                                         :strict-host-key-checking :no}))
+  ([{:keys [:shelf/host :shelf/username :shelf/password]}]
+   (session host username password)))
+
+(defrecord SessionShell [session]
   Shell
   (execute [this args]
-    (let [command (str/join " " args)]
-      (log/debug (str "Executing command: " command))
-      (let [wrapped-command (str "echo \"___START_OUT___\"; " command "; echo \"___END_OUT___\"")
-            {exit :exit :as response} (ssh/ssh session {:in wrapped-command})]
-        (log-response response)
-        (-> response
-            (update :out (comp output unix-eol))
-            (merge (if (zero? exit)
-                     {:status :ok :ok true}
-                     {:status :failure :ok false})))))))
+    (execute-in-session session args)))
+
+(defrecord SessionSpawningShell [host username password]
+  Shell
+  (execute [this args]
+    (let [session (session host username (crypto/decrypt password "ssh"))]
+      (execute-in-session session args))))
 
 (defrecord LocalShell []
   Shell
@@ -44,16 +63,15 @@
                         {:status :ok :ok true}
                         {:status :failure :ok false})))))
 
-(defn local [] (LocalShell.))
+(defn local-shell [] (LocalShell.))
 
-(defn ssh
+(defn session-shell
   [session]
-  (SecureShell. session))
+  (SessionShell. session))
 
-(defn session [{:keys [:shelf/host :shelf/username :shelf/password]}]
-  (ssh/session (ssh/ssh-agent {}) host {:username username
-                                        :password password
-                                        :strict-host-key-checking :no}))
+(defn session-spawning-shell
+  [{:keys [:shelf/host :shelf/username :shelf/password]}]
+  (SessionSpawningShell. host username (crypto/encrypt password "ssh")))
 
 (defn config [host username password]
   {:shelf/host host
@@ -66,7 +84,7 @@
   [config & body]
   `(let [session# (session ~config)]
      (try
-       (let [~'shell (ssh session#)]
+       (let [~'shell (session-shell session#)]
            (when-not (ssh/connected? session#)
              (ssh/connect session#))
            ~@body)
