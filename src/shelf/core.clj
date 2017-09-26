@@ -23,16 +23,20 @@
 
 (defn ^:private execute-in-session
   [session args]
-  (let [command (str/join " " args)]
-    (log/debug (str "Executing command: " command))
-    (let [wrapped-command (str "echo \"___START_OUT___\"; " command "; echo \"___END_OUT___\"")
-          {exit :exit :as response} (ssh/ssh session {:in wrapped-command})]
-      (log-response response)
-      (-> response
-          (update :out (comp output unix-eol))
-          (merge (if (zero? exit)
-                   {:status :ok :ok true}
-                   {:status :failure :ok false}))))))
+  (try
+    (let [command (str/join " " args)]
+      (log/debug (str "Executing command: " command))
+      (let [wrapped-command (str "echo \"___START_OUT___\"; " command "; echo \"___END_OUT___\"")
+            {exit :exit :as response} (ssh/ssh session {:in wrapped-command})]
+        (log-response response)
+        (-> response
+            (update :out (comp output unix-eol))
+            (merge (if (zero? exit)
+                     {:status :ok :ok true}
+                     {:status :failure :ok false})))))
+    (catch com.jcraft.jsch.JSchException ex
+      (log/error ex)
+      {:status :exception :ok false :exception ex})))
 
 (defn session
   ([host username password]
