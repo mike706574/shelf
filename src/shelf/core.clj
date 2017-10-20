@@ -6,6 +6,19 @@
             [shelf.crypto :as crypto]
             [taoensso.timbre :as log]))
 
+(s/def :shelf/host string?)
+(s/def :shelf/username string?)
+(s/def :shelf/password string?)
+
+(s/def :shelf/basic-ssh-config (s/keys :req [:shelf/host :shelf/username :shelf/password]))
+
+(defmulti shelf-type :shelf/type)
+(defmethod shelf-type "local" [_] (s/keys))
+(defmethod shelf-type "multi-session-basic-ssh" [_] :shelf/basic-ssh-config)
+(defmethod shelf-type "single-session-basic-ssh" [_] :shelf/basic-ssh-config)
+
+(s/def :shelf/config (s/multi-spec shelf-type :shelf/type))
+
 (defprotocol Shell
   (execute [this args]))
 
@@ -22,6 +35,7 @@
 (defn ^:private unix-eol [s] (.replace s "\r\n" "\n"))
 
 (defn ^:private execute-in-session
+  "Executes the command composed of args in the given SSH session."
   [session args]
   (try
     (let [command (str/join " " args)]
@@ -39,6 +53,7 @@
       {:status :exception :ok false :exception ex})))
 
 (defn session
+  "Returns a fresh SSH session."
   ([host username password]
    (ssh/session (ssh/ssh-agent {}) host {:username username
                                          :password password
@@ -46,45 +61,14 @@
   ([{:keys [:shelf/host :shelf/username :shelf/password]}]
    (session host username password)))
 
-(defrecord SessionShell [session]
+;; single-session shell
+(defrecord SingleSessionBasicSSH [session]
   Shell
   (execute [this args]
     (execute-in-session session args)))
 
-(defrecord SessionSpawningShell [host username password]
-  Shell
-  (execute [this args]
-    (let [session (session host username (crypto/decrypt password "ssh"))]
-      (execute-in-session session args))))
-
-(defrecord LocalShell []
-  Shell
-  (execute [this args]
-    (log/debug (str "Executing command: " (str/join " " args)))
-    (let [{exit :exit :as response} (apply sh/sh args)]
-      (log-response response)
-      (merge response (if (zero? exit)
-                        {:status :ok :ok true}
-                        {:status :failure :ok false})))))
-
-(defn local-shell [] (LocalShell.))
-
-(defn session-shell
-  [session]
-  (SessionShell. session))
-
-(defn session-spawning-shell
-  [{:keys [:shelf/host :shelf/username :shelf/password]}]
-  (SessionSpawningShell. host username (crypto/encrypt password "ssh")))
-
-(defn config [host username password]
-  {:shelf/host host
-   :shelf/username username
-   :shelf/password password})
-
-(defn exec [shell args] (execute shell args))
-
 (defmacro with-ssh
+  "Executes body with session and shell bound to a fresh SSH session and a single-session shell respectively."
   [config & body]
   `(let [session# (session ~config)]
      (try
@@ -95,7 +79,51 @@
        (finally
         (ssh/disconnect session#)))))
 
-(s/def :shelf/host string?)
-(s/def :shelf/username string?)
-(s/def :shelf/password string?)
-(s/def :shelf/config (s/keys :req [:shelf/host :shelf/username :shelf/password]))
+(defn single-session-basic-ssh
+  [session]
+  (SingleSessionBasicSSH. session))
+
+;; multi-session shell
+(defrecord MultiSessionBasicSSH [host username password]
+  Shell
+  (execute [this args]
+    (let [session (session host username (crypto/decrypt password "ssh"))]
+      (try
+        (execute-in-session session args)
+        (finally (ssh/disconnect session))))))
+
+;; local
+(defrecord LocalShell []
+  Shell
+  (execute [this args]
+    (log/debug (str "Executing command: " (str/join " " args)))
+    (let [{exit :exit :as response} (apply sh/sh args)]
+      (log-response response)
+      (merge response (if (zero? exit)
+                        {:status :ok :ok true}
+                        {:status :failure :ok false})))))
+
+(defn local-sh [_] (LocalShell.))
+
+(defn multi-session-basic-ssh
+  [{:keys [:shelf/host :shelf/username :shelf/password]}]
+  (MultiSessionBasicSSH. host username (crypto/encrypt password "ssh")))
+
+;; rest
+(defn ssh-config [type host username password]
+  {:shelf/type type
+   :shelf/host host
+   :shelf/username username
+   :shelf/password password})
+
+(defn exec [shell args] (execute shell args))
+
+(defn shell
+  [config]
+  (if-let [error (s/explain-data :shelf/config config)]
+    (throw (ex-info "Invalid shelf config." error))
+    (let [constructor (case (:shelf/type config)
+                        "local" local-sh
+                        "multi-session-basic-ssh" multi-session-basic-ssh
+                        "single-session-basic-ssh" single-session-basic-ssh)]
+      (constructor config))))
