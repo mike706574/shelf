@@ -4,11 +4,12 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :min-lein-version "2.0.0"
-  :dependencies [[org.clojure/spec.alpha "0.1.123"]
+  :dependencies [[org.clojure/spec.alpha "0.1.143"]
                  [com.taoensso/timbre "4.10.0"]
-                 [clj-ssh "0.5.14"]]
+                 [clj-ssh "0.5.14"]
+                 [commons-codec "1.11"]]
   :profiles {:dev {:source-paths ["dev"]
                    :target-path "target/dev"
-                   :dependencies [[org.clojure/clojure "1.9.0-alpha20"]
+                   :dependencies [[org.clojure/clojure "1.9.0-RC1"]
                                   [org.clojure/tools.namespace "0.2.11"]]}}
   :repl-options {:init-ns user})

@@ -22,6 +22,9 @@
 (defprotocol Shell
   (execute [this args]))
 
+(defn shell? [x] (instance? shelf.core.Shell x))
+(s/def :shelf/shell shell?)
+
 (defn ^:private log-response
   [{:keys [exit out err] :as response}]
   (log/debug (str "Exit Code: " exit))
