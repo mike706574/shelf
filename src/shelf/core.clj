@@ -70,18 +70,6 @@
   (execute [this args]
     (execute-in-session session args)))
 
-(defmacro with-ssh
-  "Executes body with session and shell bound to a fresh SSH session and a single-session shell respectively."
-  [config & body]
-  `(let [session# (session ~config)]
-     (try
-       (let [~'shell (session-shell session#)]
-           (when-not (ssh/connected? session#)
-             (ssh/connect session#))
-           ~@body)
-       (finally
-        (ssh/disconnect session#)))))
-
 (defn single-session-basic-ssh
   [session]
   (SingleSessionBasicSSH. session))
@@ -130,3 +118,15 @@
                         "multi-session-basic-ssh" multi-session-basic-ssh
                         "single-session-basic-ssh" single-session-basic-ssh)]
       (constructor config))))
+
+(defmacro with-ssh
+  "Executes body with session and shell bound to a fresh SSH session and a single-session shell respectively."
+  [config & body]
+  `(let [session# (session ~config)]
+     (try
+       (let [~'shell (single-session-basic-ssh session#)]
+           (when-not (ssh/connected? session#)
+             (ssh/connect session#))
+           ~@body)
+       (finally
+        (ssh/disconnect session#)))))
