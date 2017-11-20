@@ -130,3 +130,18 @@
            ~@body)
        (finally
         (ssh/disconnect session#)))))
+
+(defmacro with-shell
+  "Executes body with session and shell bound to a fresh SSH session and a single-session shell respectively."
+  [config & body]
+  (if (= (:shelf/type config) "single-session")
+    `(let [session# (session ~config)]
+       (try
+         (let [~'shell (single-session-basic-ssh session#)]
+           (when-not (ssh/connected? session#)
+             (ssh/connect session#))
+           ~@body)
+         (finally
+           (ssh/disconnect session#))))
+    `(let [~'shell (shell ~config)]
+       ~@body)))
