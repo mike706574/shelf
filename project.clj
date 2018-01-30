@@ -10,7 +10,7 @@
                  [commons-codec "1.11"]]
   :profiles {:dev {:source-paths ["dev"]
                    :target-path "target/dev"
-                   :dependencies [[org.clojure/clojure "1.9.0-RC1"]
+                   :dependencies [[org.clojure/clojure "1.9.0"]
                                   [org.clojure/tools.namespace "0.2.11"]]}}
   :repositories [["releases" {:url "https://clojars.org/repo"
                               :creds :gpg}]]
