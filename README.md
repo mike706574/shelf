@@ -1,6 +1,10 @@
 # shelf
 
-A project.
+[![Clojars Project](https://img.shields.io/clojars/v/fun.mike/shelf.svg)](https://clojars.org/fun.mike/shelf)
+
+A small abstraction around executing shell commands, either locally or over SSH.
+
+I had some code that relied on shell commands, and I wasn't sure if I would be deploying it in a place where those shell commands were available locally or if my code would have to SSH to another box. I made this so I wouldn't have to care. It's probably extremely broken.
 
 ## Copyright and License
 
